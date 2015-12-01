@@ -1,0 +1,66 @@
+#!/c/util/bin/php-5.6.15-nts-Win32-VC11-x86/php
+<?php
+
+function increment_version($version){
+    $v = explode('.', $version);
+    var_dump($v);
+    $last = end($v);
+    if (is_numeric($last)){
+    	$last++;
+    	$v[count($v)-1] = "$last";
+    	var_dump($last);
+    	$nw_version = implode('.', $v);
+    	var_dump($v);
+    	return $nw_version;
+    }else{
+    	return false;
+    }
+}
+
+echo "PHP SCRIPT IN PRE-COMMIT\n";
+
+$info_files = array();
+
+$command = 'git diff --cached --name-status';
+$diff = exec ($command,$output,$return_var);
+foreach($output as $i => $line){
+	$file = substr($line, 2);
+	if (strpos($file, 'version.info')){
+		echo "Skipping version.info file";
+		continue; 
+	}
+
+	$parts = explode('/', $file);
+	if (count($parts) >= 1){
+
+		if (count($parts) >= 2){
+		   $info_file = $parts[count($parts)-2].'/version.info';
+		}else{
+			$info_file = 'version.info';
+		}
+
+		if (empty($info_files[$info_file]) && file_exists($info_file)){
+			$info_files[$info_file] = 1;
+			$info_txt = file_get_contents($info_file);
+			if (preg_match('/version = ((\d+\.)+\d+)/im', $info_txt, $regs)) {
+				$version = $regs[1];
+				$next_version = increment_version($version);
+
+				echo "$info_file: Version $version, Next Version: $next_version \n";
+
+				$new_info_txt = preg_replace('/version = ((\d+\.)+\d+)/im', 'version = '.$next_version, $info_txt);
+
+				file_put_contents($info_file, $new_info_txt);
+
+			    exec('git add '.$info_file, $output2, $return_var); //.' && git commit -m "Version update '.$next_version.'"', $output2, $return_var);
+
+			}else{
+				echo "No version = found. \n";
+			}
+		}else{
+			echo $info_file.' has already been processed or does not exist.'."\n";
+		}
+	}
+}
+
+# exit with non-zero status if fail to commit
