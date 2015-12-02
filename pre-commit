@@ -1,23 +1,15 @@
 #!/c/util/bin/php-5.6.15-nts-Win32-VC11-x86/php
 <?php
 
-function increment_version($version){
-    $v = explode('.', $version);
-    var_dump($v);
-    $last = end($v);
-    if (is_numeric($last)){
-    	$last++;
-    	$v[count($v)-1] = "$last";
-    	var_dump($last);
-    	$nw_version = implode('.', $v);
-    	var_dump($v);
-    	return $nw_version;
-    }else{
-    	return false;
-    }
+//Variables
+$VINFO = 'version.info';
+$PREG = '/version = ((\d+\.)+\d+)/im';
+function REPLACE($nw_version){
+	return 'version = '.$nw_version;
 }
 
-echo "PHP SCRIPT IN PRE-COMMIT\n";
+//Start of program
+echo "Attempting to Increment Version Number...\n";
 
 $info_files = array();
 
@@ -25,8 +17,8 @@ $command = 'git diff --cached --name-status';
 $diff = exec ($command,$output,$return_var);
 foreach($output as $i => $line){
 	$file = substr($line, 2);
-	if (strpos($file, 'version.info')){
-		echo "Skipping version.info file";
+	if (strpos($file, $VINFO)){
+		echo "Skipping $VINFO file";
 		continue; 
 	}
 
@@ -34,28 +26,28 @@ foreach($output as $i => $line){
 	if (count($parts) >= 1){
 
 		if (count($parts) >= 2){
-		   $info_file = $parts[count($parts)-2].'/version.info';
+		   $info_file = $parts[count($parts)-2].'/'.$VINFO;
 		}else{
-			$info_file = 'version.info';
+			$info_file = $VINFO;
 		}
 
 		if (empty($info_files[$info_file]) && file_exists($info_file)){
 			$info_files[$info_file] = 1;
 			$info_txt = file_get_contents($info_file);
-			if (preg_match('/version = ((\d+\.)+\d+)/im', $info_txt, $regs)) {
+			if (preg_match($PREG, $info_txt, $regs)) {
 				$version = $regs[1];
 				$next_version = increment_version($version);
 
 				echo "$info_file: Version $version, Next Version: $next_version \n";
 
-				$new_info_txt = preg_replace('/version = ((\d+\.)+\d+)/im', 'version = '.$next_version, $info_txt);
+				$new_info_txt = preg_replace($PREG, REPLACE($next_version), $info_txt);
 
 				file_put_contents($info_file, $new_info_txt);
 
 			    exec('git add '.$info_file, $output2, $return_var); //.' && git commit -m "Version update '.$next_version.'"', $output2, $return_var);
 
 			}else{
-				echo "No version = found. \n";
+				echo "No $PREG found. \n";
 			}
 		}else{
 			echo $info_file.' has already been processed or does not exist.'."\n";
@@ -64,3 +56,16 @@ foreach($output as $i => $line){
 }
 
 # exit with non-zero status if fail to commit
+
+function increment_version($version){
+    $v = explode('.', $version);
+    $last = end($v);
+    if (is_numeric($last)){
+    	$last++;
+    	$v[count($v)-1] = "$last";
+    	$nw_version = implode('.', $v);
+    	return $nw_version;
+    }else{
+    	return false;
+    }
+}
