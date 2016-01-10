@@ -1,18 +1,14 @@
-#!/c/util/bin/php-5.6.15-nts-Win32-VC11-x86/php
+#!/c/util/apps/php-5.6.16-nts-Win32-VC11-x86/php
 <?php
-
 //Variables
-$VINFO = 'version.info';
-$PREG = '/version = ((\d+\.)+\d+)/im';
+$VINFO = 'README.md';
+$PREG = '/v((\d+\.)+\d+)/im';
 function REPLACE($nw_version){
-	return 'version = '.$nw_version;
+	return 'v'.$nw_version;
 }
-
 //Start of program
 echo "Attempting to Increment Version Number...\n";
-
 $info_files = array();
-
 $command = 'git diff --cached --name-status';
 $diff = exec ($command,$output,$return_var);
 foreach($output as $i => $line){
@@ -21,31 +17,36 @@ foreach($output as $i => $line){
 		echo "Skipping $VINFO file";
 		continue; 
 	}
-
 	$parts = explode('/', $file);
 	if (count($parts) >= 1){
-
 		if (count($parts) >= 2){
 		   $info_file = $parts[count($parts)-2].'/'.$VINFO;
 		}else{
 			$info_file = $VINFO;
 		}
 
-		if (empty($info_files[$info_file]) && file_exists($info_file)){
-			$info_files[$info_file] = 1;
-			$info_txt = file_get_contents($info_file);
+		$check_files = array();
+		$check_files[] = $info_file;
+		$f = $info_file;
+
+		while(strpos($f, '/') !== false){
+			$f = up_dir($f);
+			$check_files[] = $f;
+		}
+
+
+
+
+		if (empty($info_files[$info_file]) && ($f = check_files($check_files)) !== false) {
+			$info_files[$f] = 1;
+			$info_txt = file_get_contents($f);
 			if (preg_match($PREG, $info_txt, $regs)) {
 				$version = $regs[1];
 				$next_version = increment_version($version);
-
 				echo "$info_file: Version $version, Next Version: $next_version \n";
-
 				$new_info_txt = preg_replace($PREG, REPLACE($next_version), $info_txt);
-
 				file_put_contents($info_file, $new_info_txt);
-
 			    exec('git add '.$info_file, $output2, $return_var); //.' && git commit -m "Version update '.$next_version.'"', $output2, $return_var);
-
 			}else{
 				echo "No $PREG found. \n";
 			}
@@ -54,9 +55,7 @@ foreach($output as $i => $line){
 		}
 	}
 }
-
 # exit with non-zero status if fail to commit
-
 function increment_version($version){
     $v = explode('.', $version);
     $last = end($v);
@@ -68,4 +67,34 @@ function increment_version($version){
     }else{
     	return false;
     }
+}
+
+function up_dir($f){
+
+   //old method: return dirname($f).'/../'.basename($f);
+
+   $e = explode('/', $f);
+
+   if (count($e) === 1){
+   	 return false; //no where up to go 
+   }
+
+   unset($e[count($e)-2]);
+
+   $e = array_values($e);
+
+   if (count($e) === 1){
+   	  return $e[0];
+   }
+
+   return implode('/', $e);
+}
+
+function check_files($ary){
+	foreach($ary as $i => $f){
+		if (file_exists($f)){
+			return $f;
+		}
+	}
+	return false;
 }
